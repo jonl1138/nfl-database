@@ -30,7 +30,10 @@ desired_indicator_params <- c("Median Sold Price",
                               "Median Sold Price Per Square Foot - All Homes",
                               "Percent Of Homes Decreasing In Values - All Homes",
                               "Percent Of Homes Increasing In Values - All Homes",
-                              "Zillow Home Value Index - All Homes")
+                              "Zillow Home Value Index - All Homes",
+                              "Zillow Home Value Index - Bottom Tier",
+                              "Zillow Home Value Index - Middle Tier",
+                              "Zillow Home Value Index - Top Tier")
 filtered_indicators <- filteredIndicatorBuilder(desired_indicator_params)
 
 ## Takes in a string area category (county, state, city), and returns a factor of all possible choices in

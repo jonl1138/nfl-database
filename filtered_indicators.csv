@@ -3,3 +3,6 @@
 "2","Percent Of Homes Decreasing In Values - All Homes","PHDVAH"
 "3","Percent Of Homes Increasing In Values - All Homes","PHIVAH"
 "4","Zillow Home Value Index - All Homes","ZHVIAH"
+"5","Zillow Home Value Index - Bottom Tier","ZHVIBT"
+"6","Zillow Home Value Index - Middle Tier","ZHVIMT"
+"7","Zillow Home Value Index - Top Tier","ZHVITT"

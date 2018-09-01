@@ -7,7 +7,7 @@ library("shiny")
 source("helper.R")
 
 ui <- fluidPage(
-  titlePanel("Real Estate Information"),
+  titlePanel("Real Estate Around You"),
   sidebarLayout(
     sidebarPanel(
       ## Dropdown menu to choose which type of area one wants to limit the area search by
@@ -19,7 +19,7 @@ ui <- fluidPage(
       ## dropdown to choose what range of dates to use in displaying information
       dateRangeInput("date_range", 
                      label = "Date range", 
-                     start = "1996-04-30"),
+                     start = "2002-04-30"),
       
       ## outputs the specific area searchbar in the ui
       uiOutput("searchbar"),
@@ -60,9 +60,6 @@ server <- function(input, output, session) {
                                             )
   ## uses the codeBuilder function from helper.R to keep the Shiny app with an updated Quandl API call and
   ## subsequent data frame
-  #current_code <- reactive({return(codeBuilder(input$indicator,input$area_category,input$area_input))})
-  #current_dataframe <- reactive({return(Quandl(current_code))})
-  
   current_dataframe <- reactive({
     return(
       filter(
@@ -71,14 +68,29 @@ server <- function(input, output, session) {
             input$indicator,input$area_category,input$area_input
           )
         )
-      , Date > input$date_range[1] && Date < input$date_range[2]
+      , Date > as.Date(input$date_range[1]) & Date < as.Date(input$date_range[2])
       )
     )
+  })
+
+  ylabel <- reactive({
+     
+    if (grepl("Percent",input$indicator)) {
+      return("Percentage")
+    } 
+    return("Dollars")
+    
   })
   
   output$graph <- renderPlot(
     ggplot(data = current_dataframe()) +
-      geom_point(mapping = aes(x = current_dataframe()$Date, y = current_dataframe()$Value))
+      geom_smooth(mapping = aes(x = current_dataframe()$Date, y = current_dataframe()$Value), color = 'blue') +
+      geom_point(mapping = aes(x = current_dataframe()$Date, y = current_dataframe()$Value), color = 'blue') +
+      labs(
+        title = paste(input$indicator,"of",input$area_input),
+        x = "Date",
+        y = ylabel()
+      )
   )
 
 }
