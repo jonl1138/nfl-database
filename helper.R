@@ -1,8 +1,7 @@
 library("dplyr")
 library("Quandl")
-library("httr")
-library("jsonlite")
 library("ggplot2")
+library("stringr")
 
 source('secret/api-key.R')
 ## reads in user-given API key to allow access to Quandl API data
@@ -16,6 +15,9 @@ city_mapping_code <- read.csv("filtered_city_mapping.csv")
 greatermetro_mapping_code <- read.csv("filtered_greatermetro_mapping.csv")
 neighborhood_mapping_code <- read.csv("filtered_neighborhood_mapping.csv")
 
+## reads in csv files linking State abbreviations to their full names
+state_abbrev_code <- read.csv("us_states.csv", stringsAsFactors = FALSE)
+
 ## takes in a vector of desired Zillow parameters and filters the indicators.csv file to write a new .csv
 ## (filtered_indicators.csv) containing only the indicator codes of said desired parameters
 filteredIndicatorBuilder <- function(parameters) {
@@ -26,7 +28,7 @@ filteredIndicatorBuilder <- function(parameters) {
 }
 
 ## vector to be used as the input in filteredIndicatorBuilder
-desired_indicator_params <- c("Median Sold Price",
+desired_indicator_params <- c("Median Sold Price - All Homes",
                               "Median Sold Price Per Square Foot - All Homes",
                               "Percent Of Homes Decreasing In Values - All Homes",
                               "Percent Of Homes Increasing In Values - All Homes",
@@ -35,6 +37,49 @@ desired_indicator_params <- c("Median Sold Price",
                               "Zillow Home Value Index - Middle Tier",
                               "Zillow Home Value Index - Top Tier")
 filtered_indicators <- filteredIndicatorBuilder(desired_indicator_params)
+
+## takes in a string name of a city/neighborhood/greatermetro, a string name of an indicator, and a dataframe of
+## an already processed query of the specific area name and returns a string comparing the specific area with the
+## state in question in regards to the chosen indicator
+comparisonStringBuilder <- function(area_name,indicator_name, df, date_range) {
+  state_abbrev <- str_sub(area_name, -2, -1)
+  state_name <- filter(state_abbrev_code, ABBREV == state_abbrev)$STATE
+  state_df <- filter(
+    Quandl(codeBuilder(indicator_name,"State",state_name))
+  , Date > date_range[1] & Date < date_range[2]
+  )
+  if (state_df[nrow(state_df),2] > df[nrow(df),2]) {
+      phrase <- "is less than the statewide measurement of "
+  } else if (state_df[nrow(state_df),2] == df[nrow(df),2]){
+      phrase <- " is equal to the statewide measurement of "
+  } else {
+      phrase <- " is greater than the statewide measurement of "
+  }
+  return(paste0("-- ",
+                "The latest Zillow measurement of the ",
+                indicator_name,
+                " of ",
+                area_name,
+                " ",
+                phrase,
+                " ",
+                state_name,
+                " (",
+                area_name,
+                " recorded ",
+                df[nrow(df),2],
+                " on ",
+                state_df[nrow(state_df),1],
+                " versus ",
+                state_name,
+                " recording ",
+                state_df[nrow(state_df),2],
+                " on ",
+                state_df[nrow(state_df),1],
+                ")"
+                )
+  )
+}
 
 ## Takes in a string area category (county, state, city), and returns a factor of all possible choices in
 ## that category
@@ -79,6 +124,11 @@ subCodeBuilderArea <- function(area_name,area_category) {
   }
 }
 
+## takes in a string "title" of a certain indicator and returns a string of the matching indicator code
+subCodeBuilderIndicator <- function(indicator_name) {
+  return(as.character(filter(filtered_indicators,INDICATOR == indicator_name)$CODE))
+}
+
 ## takes in a string of the specific choice of area, the string of the specific choice of search category, and
 ## returns the Quandl api code to get the data fitting those parameters
 codeBuilder <- function(indicator_name,area_category,area_name) {
@@ -96,17 +146,3 @@ codeBuilder <- function(indicator_name,area_category,area_name) {
   }
   return(paste0('ZILLOW/',area_abbrev,subCodeBuilderArea(area_name,area_category),'_',subCodeBuilderIndicator(indicator_name)))
 }
-
-## takes in a string "title" of a certain indicator and returns a string of the matching indicator code
-subCodeBuilderIndicator <- function(indicator_name) {
-  return(as.character(filter(filtered_indicators,INDICATOR == indicator_name)$CODE))
-}
-
-data3 <- Quandl('ZILLOW/S3_ZHVIAH')
-filtered_data3 <- filter(data3, substring(Date,1,4) == '2018')
-data4 <- Quandl('ZILLOW/Z98006_PHDVAH')
-
-ggplot(data = data3) +
-  geom_point(mapping = aes(x= data3$Date, y= data3$Value))
-
-

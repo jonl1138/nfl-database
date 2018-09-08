@@ -1,6 +1,4 @@
 library("dplyr")
-library("httr")
-library("jsonlite")
 library("Quandl")
 library("shiny")
 
@@ -13,86 +11,161 @@ ui <- fluidPage(
       ## Dropdown menu to choose which type of area one wants to limit the area search by
       selectInput("area_category", 
                   "Search By:", 
-                  selected = "State",
+                  selected = "City",
                   c("Zip Code","County", "City", "State", "Neighborhood", "Greater Metropolitan Area")),
       
       ## dropdown to choose what range of dates to use in displaying information
       dateRangeInput("date_range", 
                      label = "Date range", 
-                     start = "2002-04-30"),
+                     start = "2012-04-30"),
       
       ## outputs the specific area searchbar in the ui
       uiOutput("searchbar"),
       
-      ## dropdown to determine the category of information desired 
-      selectInput("indicator",
-                  label = "Desired Parameter",
-                  c("Choose" = '',
-                   filtered_indicators$INDICATOR),
-                  selected = "Zillow Home Value Index - All Homes",
-                  selectize = TRUE)
-
+      ## outputs the breakdown text comparing the real estate prospects of the specific area vs. that of the
+      ## state as a whole
+      htmlOutput("combined")
       
-
+      
       
     ),
     mainPanel(
-      plotOutput("graph", width = "100%", height = "400px")
+      plotOutput("msp_graph", width = "100%", height = "400px"),
+      plotOutput("zhva_graph", width = "100%", height = "400px"),
+      plotOutput("phiv_graph", width = "100%", height = "400px")
+#      plotOutput("phdv_graph", width = "100%", height = "400px")
     )
   )
 )
 
 server <- function(input, output, session) {
   source("helper.R")
-  # filtered_data3 <- filter(data3, substring(Date,1,4) == '2018')
-  # temp_graph <- ggplot(data = data3) +
-  #   geom_point(mapping = aes(x= data3$Date, y= data3$Value))
-  # output$graph <- renderPlot(temp_graph)
-  
-  
   
   ## renders the search bar for choosing the specific area name 
   output$searchbar <- renderUI(selectInput('area_input', 
-                                            'Enter Specific Area Name',
-                                            c("Choose" ='',as.character(mappingFinder(input$area_category))), 
-                                            selected = 'Washington',
-                                            selectize=TRUE)
-                                            )
-  ## uses the codeBuilder function from helper.R to keep the Shiny app with an updated Quandl API call and
-  ## subsequent data frame
-  current_dataframe <- reactive({
+                                           'Enter Specific Area Name',
+                                           c("Choose" ='',as.character(mappingFinder(input$area_category))), 
+                                           selected = 'Bellevue, WA',
+                                           selectize=TRUE)
+  )
+  
+  ## uses the codeBuilder function from helper.R to keep the Shiny app with updated Quandl API calls and
+  ## subsequent data frames representing the desired indicator options
+  msp_dataframe <- reactive({
     return(
       filter(
         Quandl(
           codeBuilder(
-            input$indicator,input$area_category,input$area_input
+            "Median Sold Price - All Homes",input$area_category,input$area_input
           )
         )
-      , Date > as.Date(input$date_range[1]) & Date < as.Date(input$date_range[2])
+        , Date > input$date_range[1] & Date < input$date_range[2]
       )
     )
   })
-
-  ylabel <- reactive({
-     
-    if (grepl("Percent",input$indicator)) {
-      return("Percentage")
-    } 
-    return("Dollars")
-    
+  
+  zhva_dataframe <- reactive({
+    return(
+      filter(
+        Quandl(
+          codeBuilder(
+            "Zillow Home Value Index - All Homes",input$area_category,input$area_input
+          )
+        )
+        , Date > input$date_range[1] & Date < input$date_range[2]
+      )
+    )
   })
   
-  output$graph <- renderPlot(
-    ggplot(data = current_dataframe()) +
-      geom_smooth(mapping = aes(x = current_dataframe()$Date, y = current_dataframe()$Value), color = 'blue') +
-      geom_point(mapping = aes(x = current_dataframe()$Date, y = current_dataframe()$Value), color = 'blue') +
+  phiv_dataframe <- reactive({
+    return(
+      filter(
+        Quandl(
+          codeBuilder(
+            "Percent Of Homes Increasing In Values - All Homes",input$area_category,input$area_input
+          )
+        )
+        , Date > input$date_range[1] & Date < input$date_range[2]
+      )
+    )
+  })
+  
+#  phdv_dataframe <- reactive({
+#    return(
+#      filter(
+#        Quandl(
+#          codeBuilder(
+#            "Percent Of Homes Decreasing In Values - All Homes",input$area_category,input$area_input
+#          )
+#        )
+#        , Date > input$date_range[1] & Date < input$date_range[2]
+#      )
+#    )
+#  })
+  
+  ## assigns to the output ui the graphical representations of the data collected by the Quandl
+  ## calls above
+  output$msp_graph <- renderPlot(
+    ggplot(data = msp_dataframe()) +
+      geom_point(mapping = aes(x = Date, y = Value), color = 'blue') +
       labs(
-        title = paste(input$indicator,"of",input$area_input),
+        title = paste("Median Sale Price of all Homes in",input$area_input),
         x = "Date",
-        y = ylabel()
+        y = "Dollars"
       )
   )
+  
+  output$zhva_graph <- renderPlot(
+    
+    ggplot(data = zhva_dataframe()) +
+      geom_point(mapping = aes(x = Date, y = Value), color = 'blue') +
+      labs(
+        title = paste("Zillow Home Value Index of all Homes in",input$area_input),
+        x = "Date",
+        y = "Dollars"
+      )
+  )
+  
+  output$phiv_graph <- renderPlot(
+    ggplot(data = phiv_dataframe()) +
+      geom_point(mapping = aes(x = Date, y = Value), color = 'blue') +
+      labs (
+        title = paste("Percent of Homes Increasing in Value in",input$area_input),
+        x = "Date",
+        y = "Percent of Homes Increasing in Value"
+      )
+  )
+  
+#  output$phdv_graph <- renderPlot(
+#    ggplot(data = phdv_dataframe()) +
+#      geom_point(mapping = aes(x = Date, y = Value), color = 'blue') +
+#      labs(
+#        title = paste("Percent of Homes Decreasing in Value in",input$area_input),
+#        x = "Date",
+#        y = "Percent of Homes Decreasing in Value"
+#      )
+#  )
+  
+  ## assigns to the output ui the comparison strings generated by comparisonStringBuilder()
+  ## in helper.R
+  part1 <- reactive({return(comparisonStringBuilder(input$area_input,"Median Sold Price - All Homes",msp_dataframe(),input$date_range))})
+  part2 <- reactive({return(comparisonStringBuilder(input$area_input,"Zillow Home Value Index - All Homes",zhva_dataframe(),input$date_range))})
+  part3 <- reactive({return(comparisonStringBuilder(input$area_input,"Percent Of Homes Increasing In Values - All Homes",phiv_dataframe(),input$date_range))})
+#  part4 <- reactive({return(comparisonStringBuilder(input$area_input,"Percent Of Homes Decreasing In Values - All Homes",phdv_dataframe(),input$date_range))})
+  
+  output$combined <- renderUI({
+    HTML(paste(
+      part1(),
+      " ",
+      part2(),
+      " ",
+      part3(),
 
+#      " ",
+#      part4(),
+      sep = "<br/>"
+    ))
+  })
 }
 
 shinyApp(ui, server)
